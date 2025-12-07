@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+
+import os
+import json
+import subprocess
+import sys
+import termios
+import tty
+from rich.console import Console
+from rich.prompt import Prompt
+console = Console()
+
+
+# -----------------------------
+# KEYS
+# -----------------------------
+def get_key():
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    return ch
+
+
+# -----------------------------
+# EXECUTE COMMAND
+# -----------------------------
+def safe_run(cmd: str):
+    try:
+        subprocess.run(cmd, shell=True, check=False)
+    except Exception as e:
+        console.print(f"[red]Error while running command: {e}[/red]")
+
+
+def read_default_state(path: str):
+    try:
+        with open(path, "r") as f:
+            return 1 if int(f.read().strip()) > 0 else 0
+    except:
+        return 0
+
+
+# -----------------------------
+# SWITCH MENU
+# -----------------------------
+def run_switch_menu(command_data):
+    components = command_data["components"]
+
+    switch_list = []
+    for comp_name, comp_data in components.items():
+        for sw_name in comp_data["switches"]:
+            switch_list.append((comp_name, sw_name))
+
+    toggles = {
+        comp_name: {
+            sw_name: (
+                read_default_state(sw_data["read_path"])
+                if "read_path" in sw_data else 0
+            )
+            for sw_name, sw_data in comp_data["switches"].items()
+        }
+        for comp_name, comp_data in components.items()
+    }
+
+    cursor = 0
+
+    def draw():
+        console.clear()
+        console.print("[black on yellow] Command Parameters [/black on yellow]\n")
+
+        idx = 0
+        for comp_name, comp_data in components.items():
+            console.print(f"[yellow]{comp_name}[/yellow]")
+
+            for sw_name in comp_data["switches"]:
+                active = (idx == cursor)
+                state = toggles[comp_name][sw_name]
+                block = "[  ■]" if state else "[■  ]"
+                color = "green" if state else "red"
+                prefix = "→" if active else " "
+
+                console.print(
+                    f" {prefix} [white on {color}]{block}[/white on {color}] [blue]{sw_name}[/blue]"
+                )
+
+                idx += 1
+
+            console.print("")
+
+    while True:
+        draw()
+        key = get_key()
+
+        if key == "-":
+            cursor = (cursor + 1) % len(switch_list)
+        elif key == "=":
+            cursor = (cursor - 1) % len(switch_list)
+        elif key == "0":  # Enter key
+            comp, sw = switch_list[cursor]
+            toggles[comp][sw] = 1 - toggles[comp][sw]
+        elif key.lower() == "9":
+            break
+
+    for comp_name, sw_group in toggles.items():
+        for sw_name, state in sw_group.items():
+            binding = components[comp_name]["switches"][sw_name]["bindings"][str(state)]
+            safe_run(binding)
+
+
+# -----------------------------
+# MAIN
+# -----------------------------
+def main():
+
+    CONFIG_PATH = os.path.expanduser("~/.config/line-commander/table.json")
+
+    if not os.path.exists(CONFIG_PATH):
+        here = os.path.dirname(os.path.abspath(__file__))
+        possible = [
+            os.path.join(here, "table.json"),
+            os.path.join(here, "src", "table.json"),
+            os.path.join(here, "..", "table.json"),
+            "/usr/share/line-cmd/table.json",
+        ]
+
+        found = None
+        for p in possible:
+            if os.path.exists(p):
+                found = p
+                break
+
+        os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+
+        if found:
+            try:
+                with open(found, "r") as src, open(CONFIG_PATH, "w") as dst:
+                    dst.write(src.read())
+                console.print(f"[green]Created config from {found} at {CONFIG_PATH}[/green]")
+            except Exception as e:
+                console.print(f"[red]Failed to create config from {found}: {e}[/red]")
+        else:
+            # create an empty minimal config to avoid crash
+            minimal = {"commands": {}}
+            try:
+                with open(CONFIG_PATH, "w") as f:
+                    json.dump(minimal, f, indent=4)
+                console.print(f"[yellow]No bundled table.json found. Created minimal config at {CONFIG_PATH}[/yellow]")
+            except Exception as e:
+                console.print(f"[red]Failed to create default config: {e}[/red]")
+
+    with open(CONFIG_PATH, "r") as f:
+        table = json.load(f)
+
+
+    console.print("[black on yellow] Available Commands [/black on yellow]\n")
+
+    cmds = list(table["commands"].keys())
+
+    for i, cmd_name in enumerate(cmds):
+        cmd = table["commands"][cmd_name]
+        console.print(
+            f"[green]{i}[/green]: [blue]{cmd_name}[/blue] "
+            f"[purple]{cmd['name']}[/purple] "
+            f"[dim]({cmd['description']})[/dim]"
+        )
+
+    choice = Prompt.ask("[blue]Enter cmd number: [/blue]").strip()
+    if not choice.isdigit():
+        choice = "0"
+
+    selected = table["commands"][cmds[int(choice)]]
+
+    if selected["type"] == "Switch":
+        run_switch_menu(selected)
+
+
+if __name__ == "__main__":
+    main()

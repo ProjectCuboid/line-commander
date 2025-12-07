@@ -1,0 +1,51 @@
+{
+    "commands": {
+        "keyboard_lights": {
+            "name": "Keyboard Lights",
+            "description": "Toggle CapsLock, Microphone and Camera indicator LEDs",
+            "type": "Switch",
+            "components": {
+                "LED Controls": {
+                    "switches": {
+                        "CapsLock": {
+                            "bindings": {
+                                "0": "echo 0 | sudo tee /sys/class/leds/input3::capslock/brightness",
+                                "1": "echo 1 | sudo tee /sys/class/leds/input3::capslock/brightness"
+                            }
+                        },
+                        "Mic LED": {
+                            "bindings": {
+                                "0": "echo 0 | sudo tee /sys/class/leds/platform::micmute/brightness",
+                                "1": "echo 1 | sudo tee /sys/class/leds/platform::micmute/brightness"
+                            }
+                        },
+                        "Camera LED": {
+                            "bindings": {
+                                "0": "echo 0 | sudo tee /sys/class/leds/asus::camera/brightness",
+                                "1": "echo 1 | sudo tee /sys/class/leds/asus::camera/brightness"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        "disable_keyboard": {
+            "name": "Disable Keyboard",
+            "description": "Enable or disable the laptop's internal keyboard",
+            "type": "Switch",
+            "components": {
+                "Keyboard Control": {
+                    "switches": {
+                        "Internal Keyboard": {
+                            "bindings": {
+                                "0": "echo 1 | sudo tee /sys/devices/platform/i8042/serio0/input/input3/inhibited",
+                                "1": "echo 0 | sudo tee /sys/devices/platform/i8042/serio0/input/input3/inhibited"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
