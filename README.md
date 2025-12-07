@@ -1,4 +1,4 @@
-Config File At: `~./config/line-commander/table.json`
+## Config File At: `~./config/line-commander/table.json`
 
 # Installation
 ```bash
@@ -68,9 +68,9 @@ Component Nav:
 
 ## Tips
 
-"read_path" is optional — if present, line-cmd auto-reads current state.
+`"read_path"` is optional — if present, line-cmd auto-reads current state.
 
-"bindings" defines commands executed when switch is ON ("1") or OFF ("0").
+`"bindings"` defines commands executed when switch is ON ("1") or OFF ("0").
 
 Add multiple switches under one component to group related toggles.
 
